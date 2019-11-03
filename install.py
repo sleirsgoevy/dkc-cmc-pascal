@@ -1,4 +1,4 @@
-import sys, os, html
+import sys, os, html, tempfile, shlex
 
 if len(sys.argv) not in (3, 4):
     sys.stderr.write('''\
@@ -81,11 +81,15 @@ tasks = OrderedDict()
     assert set(ls_tasks) == set(map(str, range(len(ls_tasks))))
     if contest_dirs == None:
         task_names = [str(i + 1) for i in range(len(ls_tasks))]
+        statements = None
     else:
         task_names = []
-        for task in os.listdir(testsys_dir.encode('utf-8')+b'/tests/'+next(contest_dirs)):
+        statements = []
+        statements_dir = testsys_dir.encode('utf-8')+b'/tests/'+next(contest_dirs)
+        for task in os.listdir(statements_dir):
             if task.endswith(b'_r.rtf'):
                 task_names.append(task[:-6].decode('ascii', 'replace'))
+                statements.append(statements_dir+b'/'+task)
         task_names.sort()
     for j, n2 in enumerate(task_names):
         task_dir = dump_dir+'/'+str(j)
@@ -95,6 +99,26 @@ tasks = OrderedDict()
             test_set.append((open(task_dir+'/iii'+str(idx), encoding='latin-1').read(), open(task_dir+'/ooo'+str(idx), encoding='latin-1').read()))
             idx += 1
         tester += 'tasks[%r] = (%r, get_tester(%r))\n'%(str(j+1), n2, test_set)
+    if statements != None:
+        statements = iter(statements)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with open(temp_dir+'/1.html', 'w') as o_html:
+                for n2 in task_names:
+                    o_html.write('<h1>'+html.escape(n2)+'</h1>')
+                    with open(next(statements), 'rb') as rfile:
+                        with open(temp_dir+'/0.rtf', 'wb') as wfile:
+                            wfile.write(rfile.read())
+                    assert not os.system('libreoffice --convert-to html --outdir '+shlex.quote(temp_dir)+' '+shlex.quote(temp_dir+'/0.rtf'))
+                    with open(temp_dir+'/0.html') as rfile:
+                        o_html.write(rfile.read())
+            assert not os.system('libreoffice --convert-to odt --outdir '+shlex.quote(temp_dir)+' '+shlex.quote(temp_dir+'/1.html'))
+            with open(temp_dir+'/1.odt', 'rb') as rfile:
+                with open(temp_dir+'/2.odt', 'wb') as wfile:
+                    wfile.write(rfile.read())
+            assert not os.system('libreoffice --convert-to html --outdir '+shlex.quote(temp_dir)+' '+shlex.quote(temp_dir+'/2.odt'))
+            with open(temp_dir+'/2.html') as rfile:
+                with open(contest_dir+'/tasks.html', 'w') as file: file.write(rfile.read())
+                tester += '\nintro = %r\n'%('<a href="../tasks/cmc-pas-'+str(i)+'">Условия задач</a>')
     with open(contest_dir+'/tester.py', 'w') as file: file.write(tester)
 
 os.mkdir(data_dir+'/scoreboard/cmc-pas')
