@@ -17,6 +17,25 @@ def listdir_russian(path):
 def listdir_sorted(path):
     return list(sorted(os.listdir(path.encode('utf-8')), key=lambda x: x.split(b'!', 1)[0]))
 
+def keyfunc(name):
+    i = 0
+    ans = []
+    while i < len(name):
+        if name[i].isnumeric():
+            q = ''
+            while i < len(name) and name[i].isnumeric():
+                q += name[i]
+                i += 1
+            ans.append(int(q))
+            ans.append(q)
+        else:
+            q = ''
+            while i < len(name) and not name[i].isnumeric():
+                q += name[i]
+                i += 1
+            ans.append(q)
+    return tuple(ans)
+
 data_dir = sys.argv[1]
 tests_dir = sys.argv[2]
 testsys_dir = sys.argv[3] if len(sys.argv) == 4 else None
@@ -90,7 +109,9 @@ tasks = OrderedDict()
             if task.endswith(b'_r.rtf'):
                 task_names.append(task[:-6].decode('ascii', 'replace'))
                 statements.append(statements_dir+b'/'+task)
-        task_names.sort()
+        task_names = list(zip(task_names, statements))
+        task_names.sort(key=lambda t: keyfunc(t[0]))
+        task_names, statements = zip(*task_names)
     for j, n2 in enumerate(task_names):
         task_dir = dump_dir+'/'+str(j)
         test_set = []
